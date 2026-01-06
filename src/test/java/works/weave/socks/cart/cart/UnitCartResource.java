@@ -21,13 +21,13 @@ public class UnitCartResource {
     public void whenCartExistsUseThat() {
         Cart cart = new Cart(customerId);
         fake.save(cart);
-        CartResource cartResource = new CartResource(fake, customerId);
+        CartResource cartResource = new CartResource(fake, customerId, null);
         assertThat(cartResource.value().get(), equalTo(cart));
     }
 
     @Test
     public void whenCartDoesntExistCreateNew() {
-        CartResource cartResource = new CartResource(fake, customerId);
+        CartResource cartResource = new CartResource(fake, customerId, null);
         assertThat(cartResource.value().get(), is(notNullValue()));
         assertThat(cartResource.value().get().customerId, is(equalTo(customerId)));
     }
@@ -36,28 +36,28 @@ public class UnitCartResource {
     public void whenDestroyRemoveItem() {
         Cart cart = new Cart(customerId);
         fake.save(cart);
-        CartResource cartResource = new CartResource(fake, customerId);
+        CartResource cartResource = new CartResource(fake, customerId, null);
         cartResource.destroy().run();
         assertThat(fake.findByCustomerId(customerId), is(empty()));
     }
 
     @Test
     public void whenDestroyOnEmptyStillEmpty() {
-        CartResource cartResource = new CartResource(fake, customerId);
+        CartResource cartResource = new CartResource(fake, customerId, null);
         cartResource.destroy().run();
         assertThat(fake.findByCustomerId(customerId), is(empty()));
     }
 
     @Test
     public void whenCreateDoCreate() {
-        CartResource cartResource = new CartResource(fake, customerId);
+        CartResource cartResource = new CartResource(fake, customerId, null);
         cartResource.create().get();
         assertThat(fake.findByCustomerId(customerId), is(not(empty())));
     }
 
     @Test
     public void contentsShouldBeEmptyWhenNew() {
-        CartResource cartResource = new CartResource(fake, customerId);
+        CartResource cartResource = new CartResource(fake, customerId, null);
         cartResource.create().get();
         assertThat(cartResource.contents().get().contents().get(), is(empty()));
     }
@@ -68,16 +68,16 @@ public class UnitCartResource {
         String person2 = "person2";
         Item person1Item = new Item("item1");
         Item person2Item = new Item("item2");
-        CartResource cartResource = new CartResource(fake, person1);
+        CartResource cartResource = new CartResource(fake, person1, null);
         cartResource.contents().get().add(() -> person1Item).run();
-        CartResource cartResourceToMerge = new CartResource(fake, person2);
+        CartResource cartResourceToMerge = new CartResource(fake, person2, null);
         cartResourceToMerge.contents().get().add(() -> person2Item).run();
         cartResource.merge(cartResourceToMerge.value().get()).run();
         assertThat(cartResource.contents().get().contents().get(), hasSize(2));
-        assertThat(cartResource.contents().get().contents().get().get(0), anyOf(equalTo(person1Item), equalTo
-                (person2Item)));
-        assertThat(cartResource.contents().get().contents().get().get(1), anyOf(equalTo(person1Item), equalTo
-                (person2Item)));
+        assertThat(cartResource.contents().get().contents().get().get(0),
+                anyOf(equalTo(person1Item), equalTo(person2Item)));
+        assertThat(cartResource.contents().get().contents().get().get(1),
+                anyOf(equalTo(person1Item), equalTo(person2Item)));
         assertThat(cartResourceToMerge.contents().get().contents().get(), hasSize(1));
     }
 }

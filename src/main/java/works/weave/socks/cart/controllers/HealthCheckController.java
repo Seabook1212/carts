@@ -1,5 +1,6 @@
 package works.weave.socks.cart.controllers;
 
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
@@ -13,34 +14,37 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 @RestController
 public class HealthCheckController {
 
-    @Autowired
-    private MongoTemplate mongoTemplate;
+   private final Logger LOG = getLogger(getClass());
 
-    @ResponseStatus(HttpStatus.OK)
-    @RequestMapping(method = RequestMethod.GET, path = "/health")
-    public
-    @ResponseBody
-    Map<String, List<HealthCheck>> getHealth() {
-       Map<String, List<HealthCheck>> map = new HashMap<String, List<HealthCheck>>();
-       List<HealthCheck> healthChecks = new ArrayList<HealthCheck>();
-       Date dateNow = Calendar.getInstance().getTime();
+   @Autowired
+   private MongoTemplate mongoTemplate;
 
-       HealthCheck app = new HealthCheck("carts", "OK", dateNow);
-       HealthCheck database = new HealthCheck("carts-db", "OK", dateNow);
+   @ResponseStatus(HttpStatus.OK)
+   @RequestMapping(method = RequestMethod.GET, path = "/health")
+   public @ResponseBody Map<String, List<HealthCheck>> getHealth() {
+      Map<String, List<HealthCheck>> map = new HashMap<String, List<HealthCheck>>();
+      List<HealthCheck> healthChecks = new ArrayList<HealthCheck>();
+      Date dateNow = Calendar.getInstance().getTime();
 
-       try {
-          mongoTemplate.executeCommand("{ buildInfo: 1 }");
-       } catch (Exception e) {
-          database.setStatus("err");
-       }
+      HealthCheck app = new HealthCheck("carts", "OK", dateNow);
+      HealthCheck database = new HealthCheck("carts-db", "OK", dateNow);
 
-       healthChecks.add(app);
-       healthChecks.add(database);
+      try {
+         mongoTemplate.executeCommand("{ buildInfo: 1 }");
+      } catch (Exception e) {
+         LOG.error("Health check failed to connect to database: " + e.getMessage());
+         database.setStatus("err");
+      }
 
-       map.put("health", healthChecks);
-       return map;
-    }
+      healthChecks.add(app);
+      healthChecks.add(database);
+
+      map.put("health", healthChecks);
+      return map;
+   }
 }
