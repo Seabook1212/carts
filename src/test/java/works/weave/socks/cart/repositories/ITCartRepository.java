@@ -1,24 +1,24 @@
 package works.weave.socks.cart.repositories;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+// RunWith not needed in JUnit 5
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.boot.test.context.SpringBootTest;
 import works.weave.socks.cart.entities.Cart;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@RunWith(SpringRunner.class)
+// @RunWith removed for JUnit 5
 @EnableAutoConfiguration
 public class ITCartRepository {
     @Autowired
     private CartRepository cartRepository;
 
-    @Before
+    @BeforeEach
     public void removeAllData() {
         cartRepository.deleteAll();
     }

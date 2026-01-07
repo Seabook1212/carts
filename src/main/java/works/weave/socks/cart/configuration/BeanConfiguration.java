@@ -16,8 +16,8 @@ import io.micrometer.core.instrument.binder.logging.LogbackMetrics;
 import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.binder.system.UptimeMetrics;
-import io.micrometer.prometheus.PrometheusConfig;
-import io.micrometer.prometheus.PrometheusMeterRegistry;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import works.weave.socks.cart.cart.CartDAO;
 import works.weave.socks.cart.entities.Cart;
 import works.weave.socks.cart.entities.Item;
@@ -27,7 +27,7 @@ import works.weave.socks.cart.repositories.ItemRepository;
 
 import java.util.List;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 
 @Configuration
 public class BeanConfiguration {
@@ -43,7 +43,6 @@ public class BeanConfiguration {
     }
 
     @Bean
-    @Autowired
     public CartDAO getCartDao(CartRepository cartRepository) {
         return new CartDAO() {
             @Override
@@ -64,7 +63,6 @@ public class BeanConfiguration {
     }
 
     @Bean
-    @Autowired
     public ItemDAO getItemDao(ItemRepository itemRepository) {
         return new ItemDAO() {
             @Override

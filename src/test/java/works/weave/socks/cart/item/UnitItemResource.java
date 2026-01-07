@@ -1,12 +1,12 @@
 package works.weave.socks.cart.item;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import works.weave.socks.cart.entities.Item;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.IsEqual.equalTo;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 
 public class UnitItemResource {

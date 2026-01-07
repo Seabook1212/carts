@@ -1,12 +1,12 @@
 package works.weave.socks.cart.controllers;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+// RunWith not needed in JUnit 5
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.boot.test.context.SpringBootTest;
 import works.weave.socks.cart.cart.CartDAO;
 import works.weave.socks.cart.entities.Item;
 import works.weave.socks.cart.item.ItemDAO;
@@ -14,9 +14,9 @@ import works.weave.socks.cart.item.ItemDAO;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
-@RunWith(SpringJUnit4ClassRunner.class)
+// @RunWith removed for JUnit 5
 @ContextConfiguration
 public class UnitItemsController {
 

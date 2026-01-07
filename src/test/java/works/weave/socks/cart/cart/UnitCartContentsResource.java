@@ -1,7 +1,7 @@
 package works.weave.socks.cart.cart;
 
 import org.hamcrest.collection.IsCollectionWithSize;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import works.weave.socks.cart.entities.Cart;
 import works.weave.socks.cart.entities.Item;
 

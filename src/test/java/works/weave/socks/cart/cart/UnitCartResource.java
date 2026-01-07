@@ -1,6 +1,6 @@
 package works.weave.socks.cart.cart;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import works.weave.socks.cart.entities.Cart;
 import works.weave.socks.cart.entities.Item;
 
@@ -10,7 +10,7 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.core.IsEqual.equalTo;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class UnitCartResource {
 
