@@ -1,22 +1,13 @@
 package works.weave.socks.cart.middleware;
 
-import io.prometheus.client.Histogram;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
-import org.springframework.data.rest.core.config.RepositoryRestConfiguration;
-import org.springframework.data.rest.core.mapping.ResourceMappings;
-import org.springframework.data.rest.webmvc.RepositoryRestHandlerMapping;
-import org.springframework.data.rest.webmvc.support.JpaHelper;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.ModelAndView;
-import org.springframework.web.servlet.mvc.condition.PatternsRequestCondition;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import io.prometheus.client.Histogram;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.HashSet;
-import java.util.Set;
 
 public class HTTPMonitoringInterceptor implements HandlerInterceptor {
     static final Histogram requestLatency = Histogram.build()
@@ -26,18 +17,8 @@ public class HTTPMonitoringInterceptor implements HandlerInterceptor {
             .register();
 
     private static final String startTimeKey = "startTime";
-    @Autowired
-    ResourceMappings mappings;
-    // @Autowired
-    // JpaHelper jpaHelper;
-    @Autowired
-    RepositoryRestConfiguration repositoryConfiguration;
-    @Autowired
-    ApplicationContext applicationContext;
-    @Autowired
-    RequestMappingHandlerMapping requestMappingHandlerMapping;
-    private Set<PatternsRequestCondition> urlPatterns;
-    @Value("${spring.application.name:orders}")
+
+    @Value("${spring.application.name:carts}")
     private String serviceName;
 
     @Override
@@ -50,11 +31,17 @@ public class HTTPMonitoringInterceptor implements HandlerInterceptor {
     @Override
     public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o,
             ModelAndView modelAndView) throws Exception {
-        long start = (long) httpServletRequest.getAttribute(startTimeKey);
+        Object startTimeAttr = httpServletRequest.getAttribute(startTimeKey);
+        if (startTimeAttr == null) {
+            return;
+        }
+
+        long start = (long) startTimeAttr;
         long elapsed = System.nanoTime() - start;
         double seconds = (double) elapsed / 1000000000.0;
+
         String matchedUrl = getMatchingURLPattern(httpServletRequest);
-        if (!matchedUrl.equals("")) {
+        if (matchedUrl != null && !matchedUrl.isEmpty()) {
             requestLatency.labels(
                     serviceName,
                     httpServletRequest.getMethod(),
@@ -68,54 +55,25 @@ public class HTTPMonitoringInterceptor implements HandlerInterceptor {
             Object o, Exception e) throws Exception {
     }
 
+    /**
+     * Get the matched URL pattern from the request attributes.
+     * Spring Boot 3 uses PathPattern by default which stores the matched pattern in
+     * request attributes.
+     */
     private String getMatchingURLPattern(HttpServletRequest httpServletRequest) {
-        String res = "";
-        for (PatternsRequestCondition pattern : getUrlPatterns()) {
-            if (pattern.getMatchingCondition(httpServletRequest) != null &&
-                    !httpServletRequest.getServletPath().equals("/error")) {
-                res = pattern.getMatchingCondition(httpServletRequest).getPatterns().iterator()
-                        .next();
-                break;
-            }
+        // Skip error paths
+        if ("/error".equals(httpServletRequest.getServletPath())) {
+            return "";
         }
-        return res;
-    }
 
-    // private Set<PatternsRequestCondition> getUrlPatterns() {
-    // if (this.urlPatterns == null) {
-    // this.urlPatterns = new HashSet<>();
-    // requestMappingHandlerMapping.getHandlerMethods().forEach((mapping,
-    // handlerMethod) ->
-    // urlPatterns.add(mapping.getPatternsCondition()));
-    // RepositoryRestHandlerMapping repositoryRestHandlerMapping = new
-    // RepositoryRestHandlerMapping(mappings, repositoryConfiguration);
-    // // repositoryRestHandlerMapping.setJpaHelper(jpaHelper);
-    // repositoryRestHandlerMapping.setApplicationContext(applicationContext);
-    // repositoryRestHandlerMapping.afterPropertiesSet();
-    // repositoryRestHandlerMapping.getHandlerMethods().forEach((mapping,
-    // handlerMethod) ->
-    // urlPatterns.add(mapping.getPatternsCondition()));
-    // }
-    // return this.urlPatterns;
-    // }
-
-    private synchronized Set<PatternsRequestCondition> getUrlPatterns() {
-        if (this.urlPatterns == null) {
-            // 使用局部变量构建，最后赋值，避免并发问题
-            Set<PatternsRequestCondition> patterns = new HashSet<>();
-            requestMappingHandlerMapping.getHandlerMethods()
-                    .forEach((mapping, handlerMethod) -> patterns.add(mapping.getPatternsCondition()));
-
-            RepositoryRestHandlerMapping repositoryRestHandlerMapping = new RepositoryRestHandlerMapping(mappings,
-                    repositoryConfiguration);
-            repositoryRestHandlerMapping.setApplicationContext(applicationContext);
-            repositoryRestHandlerMapping.afterPropertiesSet();
-            repositoryRestHandlerMapping.getHandlerMethods()
-                    .forEach((mapping, handlerMethod) -> patterns.add(mapping.getPatternsCondition()));
-
-            this.urlPatterns = patterns;
+        // In Spring Boot 3, the best matching pattern is stored in request attributes
+        Object pattern = httpServletRequest.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        if (pattern != null) {
+            return pattern.toString();
         }
-        return this.urlPatterns;
-    }
 
+        // Fallback to request URI if no pattern found
+        String uri = httpServletRequest.getRequestURI();
+        return uri != null ? uri : "";
+    }
 }
