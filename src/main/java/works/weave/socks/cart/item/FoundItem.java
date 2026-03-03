@@ -20,18 +20,26 @@ public class FoundItem implements Supplier<Item> {
 
     @Override
     public Item get() {
-        return items.get().stream()
-                .filter(item.get()::equals)
+        Item sought = item.get();
+        List<Item> currentItems = items.get();
+        return currentItems.stream()
+                .filter(sought::equals)
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Cannot find item in cart"));
+                .orElseThrow(() -> new ItemNotFoundException("Cannot find item in cart for itemId=" + sought.itemId()));
     }
 
     public boolean hasItem() {
-        boolean present = items.get().stream()
-                .filter(item.get()::equals)
+        Item sought = item.get();
+        List<Item> currentItems = items.get();
+        boolean present = currentItems.stream()
+                .filter(sought::equals)
                 .findFirst()
                 .isPresent();
-        LOG.debug((present ? "Found" : "Didn't find") + " item: " + item.get() + ", in: " + items.get());
+        LOG.debug(
+                "event=item_lookup itemId={} present={} currentItemCount={}",
+                sought.itemId(),
+                present,
+                currentItems.size());
         return present;
     }
 }

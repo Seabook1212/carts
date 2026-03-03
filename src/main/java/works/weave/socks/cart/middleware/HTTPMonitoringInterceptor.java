@@ -1,5 +1,6 @@
 package works.weave.socks.cart.middleware;
 
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
@@ -9,7 +10,12 @@ import io.prometheus.client.Histogram;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import java.util.concurrent.TimeUnit;
+
+import static org.slf4j.LoggerFactory.getLogger;
+
 public class HTTPMonitoringInterceptor implements HandlerInterceptor {
+    private static final Logger LOG = getLogger(HTTPMonitoringInterceptor.class);
     static final Histogram requestLatency = Histogram.build()
             .name("http_request_duration_seconds")
             .help("Request duration in seconds.")
@@ -21,6 +27,9 @@ public class HTTPMonitoringInterceptor implements HandlerInterceptor {
     @Value("${spring.application.name:carts}")
     private String serviceName;
 
+    @Value("${carts.http.slow-request-threshold-ms:1000}")
+    private long slowRequestThresholdMs;
+
     @Override
     public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o)
             throws Exception {
@@ -31,28 +40,34 @@ public class HTTPMonitoringInterceptor implements HandlerInterceptor {
     @Override
     public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o,
             ModelAndView modelAndView) throws Exception {
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse,
+            Object o, Exception e) throws Exception {
         Object startTimeAttr = httpServletRequest.getAttribute(startTimeKey);
         if (startTimeAttr == null) {
             return;
         }
 
-        long start = (long) startTimeAttr;
-        long elapsed = System.nanoTime() - start;
-        double seconds = (double) elapsed / 1000000000.0;
-
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - (long) startTimeAttr);
         String matchedUrl = getMatchingURLPattern(httpServletRequest);
         if (matchedUrl != null && !matchedUrl.isEmpty()) {
             requestLatency.labels(
                     serviceName,
                     httpServletRequest.getMethod(),
                     matchedUrl,
-                    Integer.toString(httpServletResponse.getStatus())).observe(seconds);
+                    Integer.toString(httpServletResponse.getStatus())).observe(elapsedMs / 1000.0);
         }
-    }
 
-    @Override
-    public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse,
-            Object o, Exception e) throws Exception {
+        if (elapsedMs >= slowRequestThresholdMs) {
+            LOG.warn(
+                    "event=slow_request method={} path={} status={} latency_ms={}",
+                    httpServletRequest.getMethod(),
+                    matchedUrl,
+                    httpServletResponse.getStatus(),
+                    elapsedMs);
+        }
     }
 
     /**

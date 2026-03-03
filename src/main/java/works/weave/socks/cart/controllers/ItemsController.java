@@ -1,5 +1,6 @@
 package works.weave.socks.cart.controllers;
 
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import brave.Tracer;
 import works.weave.socks.cart.cart.CartDAO;
 import works.weave.socks.cart.cart.CartResource;
+import works.weave.socks.cart.entities.Cart;
 import works.weave.socks.cart.entities.Item;
 import works.weave.socks.cart.item.FoundItem;
 import works.weave.socks.cart.item.ItemDAO;
@@ -39,33 +41,39 @@ public class ItemsController {
     @ResponseStatus(HttpStatus.OK)
     @RequestMapping(value = "/{itemId:.*}", produces = MediaType.APPLICATION_JSON_VALUE, method = RequestMethod.GET)
     public Item get(@PathVariable String customerId, @PathVariable String itemId) {
-        LOG.info("Item get method: Getting item: " + itemId + " for user: " + customerId);
         return new FoundItem(() -> getItems(customerId), () -> new Item(itemId)).get();
     }
 
     @ResponseStatus(HttpStatus.OK)
     @RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE, method = RequestMethod.GET)
     public List<Item> getItems(@PathVariable String customerId) {
-        LOG.info("Items getItems method: Getting items for user: " + customerId);
         return cartsController.get(customerId).contents();
     }
 
     @ResponseStatus(HttpStatus.CREATED)
     @RequestMapping(consumes = MediaType.APPLICATION_JSON_VALUE, method = RequestMethod.POST)
-    public Item addToCart(@PathVariable String customerId, @RequestBody Item item) {
+    public Item addToCart(@PathVariable String customerId, @Valid @RequestBody Item item) {
         TailLatencyFault.maybeInject(10);
         doExceptionInject(customerId);
 
         // If the item does not exist in the cart, create new one in the repository.
         FoundItem foundItem = new FoundItem(() -> cartsController.get(customerId).contents(), () -> item);
         if (!foundItem.hasItem()) {
-            Supplier<Item> newItem = new ItemResource(itemDAO, () -> item).create();
-            LOG.debug("Did not find item. Creating item for user: " + customerId + ", " + newItem.get());
-            new CartResource(cartDAO, customerId, tracer).contents().get().add(newItem).run();
-            return item;
+            Item createdItem = new ItemResource(itemDAO, () -> item, tracer).create().get();
+            LOG.debug(
+                    "event=item_create customerId={} itemId={} quantity={}",
+                    customerId,
+                    createdItem.itemId(),
+                    createdItem.quantity());
+            new CartResource(cartDAO, customerId, tracer).contents().get().add(() -> createdItem).run();
+            return createdItem;
         } else {
             Item newItem = new Item(foundItem.get(), foundItem.get().quantity() + 1);
-            LOG.debug("Found item in cart. Incrementing for user: " + customerId + ", " + newItem);
+            LOG.debug(
+                    "event=item_increment customerId={} itemId={} quantity={}",
+                    customerId,
+                    newItem.itemId(),
+                    newItem.quantity());
             updateItem(customerId, newItem);
             return newItem;
         }
@@ -74,24 +82,29 @@ public class ItemsController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     @RequestMapping(value = "/{itemId:.*}", method = RequestMethod.DELETE)
     public void removeItem(@PathVariable String customerId, @PathVariable String itemId) {
-        FoundItem foundItem = new FoundItem(() -> getItems(customerId), () -> new Item(itemId));
-        Item item = foundItem.get();
+        CartResource cartResource = new CartResource(cartDAO, customerId, tracer);
+        Cart cart = cartResource.value().get();
+        Item item = new FoundItem(cart::contents, () -> new Item(itemId)).get();
 
-        LOG.debug("Removing item from cart: " + item);
-        new CartResource(cartDAO, customerId, tracer).contents().get().delete(() -> item).run();
+        LOG.debug("event=item_remove_from_cart customerId={} itemId={}", customerId, item.itemId());
+        cartResource.save(cart.remove(item)).run();
 
-        LOG.debug("Removing item from repository: " + item);
-        new ItemResource(itemDAO, () -> item).destroy().run();
+        LOG.debug("event=item_remove_from_repository customerId={} itemId={}", customerId, item.itemId());
+        new ItemResource(itemDAO, () -> item, tracer).destroy().run();
     }
 
     @ResponseStatus(HttpStatus.ACCEPTED)
     @RequestMapping(consumes = MediaType.APPLICATION_JSON_VALUE, method = RequestMethod.PATCH)
-    public void updateItem(@PathVariable String customerId, @RequestBody Item item) {
+    public void updateItem(@PathVariable String customerId, @Valid @RequestBody Item item) {
         doExceptionInjectV2();
         doExceptionInjectV3(item);
 
-        ItemResource itemResource = new ItemResource(itemDAO, () -> get(customerId, item.itemId()));
-        LOG.debug("Merging item in cart for user: " + customerId + ", " + item);
+        ItemResource itemResource = new ItemResource(itemDAO, () -> get(customerId, item.itemId()), tracer);
+        LOG.debug(
+                "event=item_merge customerId={} itemId={} quantity={}",
+                customerId,
+                item.itemId(),
+                item.quantity());
 
         // EX-02: NPE baseline - simulate common null pointer issue
         if (CartsCommonHelper.envTrue("FAULTS_ENABLED")
@@ -142,7 +155,6 @@ public class ItemsController {
 
                 // 模拟真实业务计算错误：用数量作为分母
                 int quantity = (item == null ? 0 : item.quantity() - 2);
-                LOG.info("quantity=" + quantity);
                 // 当 quantity == 2 时，这里会自然抛出：
                 // java.lang.ArithmeticException: / by zero
                 int avg = 100 / quantity;

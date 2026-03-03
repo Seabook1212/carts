@@ -51,6 +51,11 @@ public class BeanConfiguration {
             }
 
             @Override
+            public void deleteByCustomerId(String customerId) {
+                cartRepository.deleteByCustomerId(customerId);
+            }
+
+            @Override
             public Cart save(Cart cart) {
                 return cartRepository.save(cart);
             }

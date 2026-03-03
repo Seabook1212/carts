@@ -10,6 +10,8 @@ import java.util.Map;
 public interface CartDAO {
     void delete(Cart cart);
 
+    void deleteByCustomerId(String customerId);
+
     Cart save(Cart cart);
 
     List<Cart> findByCustomerId(String customerId);
@@ -20,6 +22,11 @@ public interface CartDAO {
         @Override
         public void delete(Cart cart) {
             cartStore.remove(cart.customerId);
+        }
+
+        @Override
+        public void deleteByCustomerId(String customerId) {
+            cartStore.remove(customerId);
         }
 
         @Override

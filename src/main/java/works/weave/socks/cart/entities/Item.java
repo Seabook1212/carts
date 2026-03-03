@@ -3,6 +3,8 @@ package works.weave.socks.cart.entities;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 @Document
@@ -11,7 +13,9 @@ public class Item {
     private String id;
 
     @NotNull(message = "Item Id must not be null")
+    @NotBlank(message = "Item Id must not be blank")
     private String itemId;
+    @Min(value = 1, message = "Quantity must be greater than or equal to 1")
     private int quantity;
     private float unitPrice;
 

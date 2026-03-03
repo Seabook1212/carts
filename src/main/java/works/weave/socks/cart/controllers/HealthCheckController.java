@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import works.weave.socks.cart.entities.HealthCheck;
+import works.weave.socks.cart.util.MongoFailureClassifier;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -37,7 +38,10 @@ public class HealthCheckController {
       try {
          mongoTemplate.executeCommand("{ buildInfo: 1 }");
       } catch (Exception e) {
-         LOG.error("Health check failed to connect to database: " + e.getMessage());
+         LOG.error(
+                 "event=healthcheck_failed dependency=mongodb target=carts-db operation=buildInfo classification={}",
+                 MongoFailureClassifier.classify(e),
+                 e);
          database.setStatus("err");
       }
 

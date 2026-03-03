@@ -1,11 +1,19 @@
 package works.weave.socks.cart.configuration;
 
+import brave.handler.MutableSpan;
+import brave.handler.SpanHandler;
+import brave.propagation.TraceContext;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
+import org.springframework.util.StringUtils;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Configuration
 public class TracingConfig {
@@ -37,6 +45,31 @@ public class TracingConfig {
                     });
                 }
                 return bean;
+            }
+        };
+    }
+
+    @Bean
+    public SpanHandler kubernetesTraceTagsSpanHandler(
+            @Value("${CONTAINER_NAME:}") String containerName,
+            @Value("${POD_NAME:}") String podName,
+            @Value("${POD_NAMESPACE:}") String podNamespace,
+            @Value("${NODE_NAME:}") String nodeName) {
+        Map<String, String> tags = new LinkedHashMap<>();
+        tags.put("container", containerName);
+        tags.put("pod", podName);
+        tags.put("namespace", podNamespace);
+        tags.put("node", nodeName);
+
+        return new SpanHandler() {
+            @Override
+            public boolean end(TraceContext context, MutableSpan span, Cause cause) {
+                tags.forEach((key, value) -> {
+                    if (StringUtils.hasText(value)) {
+                        span.tag(key, value);
+                    }
+                });
+                return true;
             }
         };
     }

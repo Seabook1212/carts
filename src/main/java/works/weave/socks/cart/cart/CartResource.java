@@ -1,14 +1,20 @@
 package works.weave.socks.cart.cart;
 
+import org.slf4j.Logger;
 import works.weave.socks.cart.action.FirstResultOrDefault;
 import works.weave.socks.cart.entities.Cart;
+import works.weave.socks.cart.util.MongoFailureClassifier;
+import works.weave.socks.cart.util.TracingExceptionTagger;
 
 import java.util.function.Supplier;
 
 import brave.Span;
 import brave.Tracer;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 public class CartResource implements Resource<Cart>, HasContents<CartContentsResource> {
+    private final Logger log = getLogger(getClass());
     private final CartDAO cartRepository;
     private final String customerId;
     private final Tracer tracer;
@@ -20,23 +26,36 @@ public class CartResource implements Resource<Cart>, HasContents<CartContentsRes
     }
 
     private <T> T inMongoSpan(String op, Supplier<T> fn) {
-        if (tracer == null)
-            return fn.get();
+        Span span = null;
+        Tracer.SpanInScope spanInScope = null;
+        if (tracer != null) {
+            span = tracer.nextSpan()
+                    .name("mongodb " + op)
+                    .kind(Span.Kind.CLIENT)
+                    .tag("db.system", "mongodb")
+                    .tag("peer.service", "carts-db")
+                    .start();
+            spanInScope = tracer.withSpanInScope(span);
+        }
 
-        Span span = tracer.nextSpan()
-                .name("mongodb " + op)
-                .kind(Span.Kind.CLIENT)
-                .tag("db.system", "mongodb")
-                .tag("peer.service", "carts-db")
-                .start();
-
-        try (Tracer.SpanInScope ws = tracer.withSpanInScope(span)) {
+        try (Tracer.SpanInScope ws = spanInScope) {
             return fn.get();
         } catch (Exception e) {
-            span.error(e);
+            if (span != null) {
+                span.error(e);
+                TracingExceptionTagger.tagException(span, e);
+            }
+            log.error(
+                    "event=dependency_call_failed dependency=mongodb target=carts-db operation={} customerId={} classification={}",
+                    op,
+                    customerId,
+                    MongoFailureClassifier.classify(e),
+                    e);
             throw e;
         } finally {
-            span.finish();
+            if (span != null) {
+                span.finish();
+            }
         }
     }
 
@@ -49,8 +68,7 @@ public class CartResource implements Resource<Cart>, HasContents<CartContentsRes
 
     @Override
     public Runnable destroy() {
-        // return () -> cartRepository.delete(value().get());
-        return () -> inMongoSpan("deleteCart", () -> cartRepository.delete(value().get()));
+        return () -> inMongoSpan("deleteCart", () -> cartRepository.deleteByCustomerId(customerId));
 
     }
 
@@ -59,6 +77,10 @@ public class CartResource implements Resource<Cart>, HasContents<CartContentsRes
         // return () -> cartRepository.save(new Cart(customerId));
         return () -> inMongoSpan("createCart", () -> cartRepository.save(new Cart(customerId)));
 
+    }
+
+    public Runnable save(Cart cart) {
+        return () -> inMongoSpan("saveCart", () -> cartRepository.save(cart));
     }
 
     @Override
@@ -79,6 +101,6 @@ public class CartResource implements Resource<Cart>, HasContents<CartContentsRes
 
     @Override
     public Supplier<CartContentsResource> contents() {
-        return () -> new CartContentsResource(cartRepository, () -> this);
+        return () -> new CartContentsResource(cartRepository, () -> this, tracer);
     }
 }
