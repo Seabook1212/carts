@@ -25,19 +25,21 @@ public class CartsController {
 
     @ResponseStatus(HttpStatus.OK)
     @RequestMapping(value = "/{customerId}", produces = MediaType.APPLICATION_JSON_VALUE, method = RequestMethod.GET)
-    public Cart get(@PathVariable String customerId) {
+    public Cart get(@PathVariable("customerId") String customerId) {
         return new CartResource(cartDAO, customerId, tracer).value().get();
     }
 
     @ResponseStatus(HttpStatus.ACCEPTED)
     @RequestMapping(value = "/{customerId}", method = RequestMethod.DELETE)
-    public void delete(@PathVariable String customerId) {
+    public void delete(@PathVariable("customerId") String customerId) {
         new CartResource(cartDAO, customerId, tracer).destroy().run();
     }
 
     @ResponseStatus(HttpStatus.ACCEPTED)
     @RequestMapping(value = "/{customerId}/merge", method = RequestMethod.GET)
-    public void mergeCarts(@PathVariable String customerId, @RequestParam(value = "sessionId") String sessionId) {
+    public void mergeCarts(
+            @PathVariable("customerId") String customerId,
+            @RequestParam("sessionId") String sessionId) {
         logger.debug("Merge carts request received for ids: " + customerId + " and " + sessionId);
         CartResource sessionCart = new CartResource(cartDAO, sessionId, tracer);
         CartResource customerCart = new CartResource(cartDAO, customerId, tracer);
